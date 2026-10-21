@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           MyWindowSize
-// @version        1.0.0
+// @version        1.1.0
 // @description    Force la géométrie de la fenêtre (x, y, largeur, hauteur) à chaque lancement — neutralise la restauration SessionStore.
 // @author         Impre
 // @include        main
@@ -19,18 +19,25 @@
   window.__myWindowSize = true;
 
   // --- Neutralisation ------------------------------------------------------
-  // SessionStore.restoreDimensions() (SessionStore.sys.mjs) restaure la
-  // géométrie de la session en appelant window.resizeTo() / window.moveTo().
-  // On les remplace par des no-op : toute tentative de restauration
-  // (startup, session de crash, etc.) tombe dans le vide.
-  // NOTE : le drag natif à la souris ne passe PAS par ces APIs JS → aucun
-  // impact sur le redimensionnement manuel.
+  // SessionStore.#restoreDimensions() (SessionStore.sys.mjs) restaure la
+  // TAILLE via window.resizeTo() → no-op ci-dessous.
+  // ⚠️ Depuis Firefox récent (base Zen actuelle), la POSITION n'emprunte plus
+  // moveTo() mais getBaseWindow(aWindow).setPositionDesktopPix() (nsIBaseWindow,
+  // objet C++ non monkey-patchable). La position ne peut donc pas être
+  // neutralisée par patch : on la RÉAFFIRME après la restauration, sur
+  // l'event fenêtre SSWindowRestored — dispatché à la résolution du promise
+  // de #restoreWindowFeatures, donc strictement APRÈS #restoreDimensions.
   const origResizeTo = window.resizeTo.bind(window);
   const origMoveTo = window.moveTo.bind(window);
   window.resizeTo = () => {};
   window.moveTo = () => {};
 
   let applied = false;
+  // SSWindowRestoring est dispatché au DÉBUT de #restoreWindow : tant qu'une
+  // restauration est pending, on ne pose pas la géométrie au load (elle
+  // serait immédiatement écrasée par le setTimeout(0) qui appelle
+  // #restoreDimensions) → c'était le "ping pong" de la 1.0.
+  let restorePending = false;
 
   function getGeometry() {
     const raw = Services.prefs.getStringPref(PREF, DEFAULT) || DEFAULT;
@@ -42,12 +49,12 @@
     return { x: parts[0], y: parts[1], w: parts[2], h: parts[3] };
   }
 
-  // Application unique de la géométrie fixe (une fois par fenêtre).
-  function apply() {
-    if (applied) return;
-    // resizeTo/moveTo sont ignorés tant que la fenêtre est maximized /
-    // minimized / fullscreen → sizemodechange prendra le relais au
-    // premier retour en état normal (ex: démaximisation).
+  // Application de la géométrie fixe (sans garde — l'unicité est gérée
+  // par les appelants via applied / restorePending).
+  function force() {
+    // resizeTo/moveTo natifs sont ignorés tant que la fenêtre est maximized /
+    // minimized / fullscreen → sizemodechange prendra le relais au premier
+    // retour en état normal (ex: démaximisation).
     if (window.windowState !== window.STATE_NORMAL) return;
     const g = getGeometry();
     if (!g || g.w <= 0 || g.h <= 0) return;
@@ -59,21 +66,49 @@
     console.log(`[MyWindowSize] géométrie appliquée : (${g.x}, ${g.y}) ${g.w}x${g.h}`);
   }
 
+  // Application unique : saute si déjà fait ou si une restauration
+  // SessionStore est en cours (SSWindowRestored prendra le relais).
+  function applyOnce() {
+    if (applied || restorePending) return;
+    force();
+  }
+
   function cleanup() {
+    window.removeEventListener('SSWindowRestoring', onWindowRestoring);
+    window.removeEventListener('SSWindowRestored', onWindowRestored);
     window.removeEventListener('sizemodechange', onSizeModeChange);
     Services.obs.removeObserver(onWindowsRestored, 'sessionstore-windows-restored');
   }
 
+  function onWindowRestoring() {
+    restorePending = true;
+  }
+
+  function onWindowRestored() {
+    // #restoreDimensions vient de tourner (position remise à celle de
+    // fermeture) → on réaffirme la géométrie voulue. Couvre TOUS les chemins
+    // de restauration : startup, réouverture de fenêtre fermée, restoreWindow.
+    restorePending = false;
+    force();
+  }
+
   function onSizeModeChange() {
-    apply();
+    applyOnce();
   }
 
+  // Backstop startup : notification globale tirée après TOUS les
+  // #restoreDimensions (et après chaque SSWindowRestored). Ne sert que si
+  // SSWindowRestored a été manqué (injection tardive du script).
   function onWindowsRestored() {
-    apply();
+    restorePending = false;
+    applyOnce();
   }
 
-  // Réappliquer les valeurs au premier retour en normal si le startup
-  // s'est fait en maximized (resizeTo y est ignoré).
+  window.addEventListener('SSWindowRestoring', onWindowRestoring);
+  window.addEventListener('SSWindowRestored', onWindowRestored);
+
+  // Réappliquer au premier retour en normal si le startup s'est fait en
+  // maximized (resizeTo/moveTo natifs y sont ignorés).
   window.addEventListener('sizemodechange', onSizeModeChange);
 
   // sessionstore-windows-restored est notifié dans TOUS les cas, avec ou
@@ -81,10 +116,10 @@
   // → point de synchronisation garanti, sans timer.
   Services.obs.addObserver(onWindowsRestored, 'sessionstore-windows-restored');
 
-  // Application la plus précoce possible : dès que le document est complet.
+  // Application la plus précoce possible (cas sans restauration SessionStore).
   if (document.readyState === 'complete') {
-    apply();
+    applyOnce();
   } else {
-    window.addEventListener('load', () => apply(), { once: true });
+    window.addEventListener('load', () => applyOnce(), { once: true });
   }
 })();
