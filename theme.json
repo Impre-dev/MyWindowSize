@@ -3,12 +3,12 @@
   "name": "MyWindowSize",
   "description": "Force la géométrie de la fenêtre (position + dimensions) à chaque lancement — neutralise la restauration de SessionStore.",
   "author": "Impre",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "js": true,
   "scripts": {
     "window-size.uc.js": {
       "name": "MyWindowSize — géométrie forcée",
-      "description": "No-op de resizeTo/moveTo + réaffirmation de la géométrie sur SSWindowRestored (la position restaurée passe désormais par setPositionDesktopPix, non patchable) — valeurs fixes via la pref MyWindowSize.geometry",
+      "description": "No-op de resizeTo/moveTo/maximize + réaffirmation de la géométrie sur SSWindowRestored et sizemodechange, listeners permanents et idempotents (la position restaurée passe par setPositionDesktopPix, non patchable) — valeurs via la pref MyWindowSize.geometry (défaut 260,20,1400,1000 : 1400x1000 centré dans la zone de travail de 1920x1080)",
       "include": ["chrome://browser/content/browser.xhtml"]
     }
   },
