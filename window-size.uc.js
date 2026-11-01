@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           MyWindowSize
-// @version        1.2.0
+// @version        1.3.0
 // @description    Force la géométrie de la fenêtre (x, y, largeur, hauteur) à chaque lancement — neutralise la restauration SessionStore.
 // @author         Impre
 // @include        main
@@ -9,12 +9,25 @@
 (function () {
   'use strict';
 
-  // Pref au format "x,y,w,h" (outer window, CSS pixels de la fenêtre).
-  // Modifiable dans about:config sans toucher au code.
-  // Calqué sur Agora (Window Spy 01/11, outer) : x252 y24 — 1416x999.
-  // 24+999=1023 < 1040 (haut de taskbar) → 17px de marge, zéro chevauchement.
-  const PREF = 'MyWindowSize.geometry';
-  const DEFAULT = '252,24,1416,999';
+  // Réglages via le panneau Sine (preferences.json) : 4 prefs STRING
+  // écrites par MCM — lecture défensive pattern SidePeek (parseInt +
+  // fallback getIntPref pour une pref posée à la main en about:config).
+  // Défauts calqués sur Agora (Window Spy 01/11, outer) : x252 y24 —
+  // 1416x999. 24+999=1023 < 1040 (haut de taskbar) → zéro chevauchement.
+  const DEFS = { x: 252, y: 24, w: 1416, h: 999 };
+
+  // PREFS (pattern SidePeek/NavBtn) : MCM écrit des STRING — parseInt ici,
+  // avec fallback getIntPref pour une pref int posée à la main.
+  const int = (name, fallback) => {
+    try {
+      if (!Services.prefs.prefHasUserValue(name)) return fallback;
+      const n = parseInt(Services.prefs.getStringPref(name, ''), 10);
+      if (Number.isFinite(n)) return n;
+      return Services.prefs.getIntPref(name);
+    } catch (e) {
+      return fallback;
+    }
+  };
 
   if (window.__myWindowSize) return;
   window.__myWindowSize = true;
@@ -48,13 +61,12 @@
   window.moveTo = () => {};
 
   function getGeometry() {
-    const raw = Services.prefs.getStringPref(PREF, DEFAULT) || DEFAULT;
-    const parts = raw.split(',').map((v) => parseInt(v.trim(), 10));
-    if (parts.length !== 4 || parts.some(Number.isNaN)) {
-      console.warn(`[MyWindowSize] pref ${PREF} invalide ("${raw}"), format attendu "x,y,w,h"`);
-      return null;
-    }
-    return { x: parts[0], y: parts[1], w: parts[2], h: parts[3] };
+    return {
+      x: int('mywindowsize.x', DEFS.x),
+      y: int('mywindowsize.y', DEFS.y),
+      w: int('mywindowsize.width', DEFS.w),
+      h: int('mywindowsize.height', DEFS.h),
+    };
   }
 
   // Déjà à la cible ? (idempotence — tolérance 1px sur la position)
@@ -116,6 +128,16 @@
   // sans session à restaurer (SessionStore.sys.mjs, NOTIFY_WINDOWS_RESTORED)
   // → point de synchronisation garanti, sans timer.
   Services.obs.addObserver(onWindowsRestored, 'sessionstore-windows-restored');
+
+  // Réglages live : tout changement dans le panneau Sine → réaffirmation
+  // (idempotente : atTarget court-circuite si rien ne bouge).
+  const prefsObs = {
+    observe(subject, topic) {
+      if (topic === 'nsPref:changed') force();
+    },
+  };
+  ['mywindowsize.x', 'mywindowsize.y', 'mywindowsize.width', 'mywindowsize.height']
+    .forEach((name) => Services.prefs.addObserver(name, prefsObs));
 
   // Application la plus précoce possible (cas sans restauration SessionStore).
   if (document.readyState === 'complete') {

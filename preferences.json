@@ -1,0 +1,35 @@
+[
+  {
+    "type": "separator",
+    "label": "🪟 Géométrie de la fenêtre (outer, px)",
+    "margin": "15px 0 15px 0"
+  },
+  {
+    "property": "mywindowsize.x",
+    "label": "Position X (px)",
+    "type": "string",
+    "placeholder": "252",
+    "defaultValue": "252"
+  },
+  {
+    "property": "mywindowsize.y",
+    "label": "Position Y (px)",
+    "type": "string",
+    "placeholder": "24",
+    "defaultValue": "24"
+  },
+  {
+    "property": "mywindowsize.width",
+    "label": "Largeur (px)",
+    "type": "string",
+    "placeholder": "1416",
+    "defaultValue": "1416"
+  },
+  {
+    "property": "mywindowsize.height",
+    "label": "Hauteur (px)",
+    "type": "string",
+    "placeholder": "999",
+    "defaultValue": "999"
+  }
+]
