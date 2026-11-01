@@ -11,11 +11,10 @@
 
   // Pref au format "x,y,w,h" (outer window, CSS pixels de la fenêtre).
   // Modifiable dans about:config sans toucher au code.
-  // 1400x1000 (1405x976 relevés au Window Spy, arrondis à la cinquantaine)
-  // centré dans la zone de travail (écran 1920x1080, taskbar 40px → 1040) :
-  // x=(1920-1400)/2=260, y=(1040-1000)/2=20 → 20px au-dessus de la taskbar.
+  // Calqué sur Agora (Window Spy 01/11, outer) : x252 y24 — 1416x999.
+  // 24+999=1023 < 1040 (haut de taskbar) → 17px de marge, zéro chevauchement.
   const PREF = 'MyWindowSize.geometry';
-  const DEFAULT = '260,20,1400,1000';
+  const DEFAULT = '252,24,1416,999';
 
   if (window.__myWindowSize) return;
   window.__myWindowSize = true;

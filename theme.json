@@ -8,7 +8,7 @@
   "scripts": {
     "window-size.uc.js": {
       "name": "MyWindowSize — géométrie forcée",
-      "description": "No-op de resizeTo/moveTo/maximize + réaffirmation de la géométrie sur SSWindowRestored et sizemodechange, listeners permanents et idempotents (la position restaurée passe par setPositionDesktopPix, non patchable) — valeurs via la pref MyWindowSize.geometry (défaut 260,20,1400,1000 : 1400x1000 centré dans la zone de travail de 1920x1080)",
+      "description": "No-op de resizeTo/moveTo/maximize + réaffirmation de la géométrie sur SSWindowRestored et sizemodechange, listeners permanents et idempotents (la position restaurée passe par setPositionDesktopPix, non patchable) — valeurs via la pref MyWindowSize.geometry (défaut 252,24,1416,999 : calqué sur Agora)",
       "include": ["chrome://browser/content/browser.xhtml"]
     }
   },
